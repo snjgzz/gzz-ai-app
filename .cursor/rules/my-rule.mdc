@@ -1,0 +1,5 @@
+---
+alwaysApply: true
+---
+
+1.需要使用组件的地方使用shadcn组件
