@@ -20,6 +20,7 @@ export default function AuthModal({
   onSuccess,
 }: Readonly<AuthModalProps>) {
   const [mode, setMode] = useState<Mode>('login');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -34,11 +35,20 @@ export default function AuthModal({
       return;
     }
 
+    if (mode === 'register' && !username) {
+      setMessage('请填写用户名');
+      return;
+    }
+
     setLoading(true);
     setMessage('');
 
     try {
-      const encryptedBody = await encryptPayload({ email, password });
+      const payload = mode === 'register' 
+        ? { email, password, username }
+        : { email, password };
+      
+      const encryptedBody = await encryptPayload(payload);
       const res = await fetch(`/api/auth/${mode}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -48,7 +58,6 @@ export default function AuthModal({
       const data = await decryptPayload<{ message?: string; error?: string }>(
         encrypted
       );
-
       if (!res.ok) {
         setMessage(data.error ?? '请求失败');
         return;
@@ -57,7 +66,9 @@ export default function AuthModal({
       setMessage(data.message ?? '成功');
       onSuccess?.(email);
       onClose();
-    } catch {
+    } catch (error) {
+      console.error(error);
+
       setMessage('网络错误');
     } finally {
       setLoading(false);
@@ -112,6 +123,15 @@ export default function AuthModal({
         </div>
 
         <form onSubmit={onSubmit} className="mt-4 space-y-3">
+          {mode === 'register' && (
+            <input
+              type="text"
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              placeholder="用户名"
+              className="w-full rounded-lg border border-gray-300 p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          )}
           <input
             type="email"
             value={email}

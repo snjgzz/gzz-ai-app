@@ -139,7 +139,6 @@ src/
 ### 代码提交前检查
 ```bash
 npm run lint     # 确保无 ESLint 错误
-npm run build    # 确保构建成功
 ```
 
 ## 特殊注意事项

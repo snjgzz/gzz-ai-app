@@ -20,7 +20,7 @@ function getKey(): Promise<CryptoKey> {
 
   cachedKey = crypto.subtle.importKey(
     'raw',
-    keyBytes,
+    keyBytes as BufferSource,
     { name: ALGORITHM },
     false,
     ['encrypt', 'decrypt']
@@ -68,9 +68,9 @@ export async function decryptPayload<T>(
   const iv = base64ToBytes(payload.iv);
   const data = base64ToBytes(payload.data);
   const decrypted = await crypto.subtle.decrypt(
-    { name: ALGORITHM, iv },
+    { name: ALGORITHM, iv: iv as BufferSource },
     await getKey(),
-    data
+    data as BufferSource
   );
 
   const json = new TextDecoder().decode(decrypted);
