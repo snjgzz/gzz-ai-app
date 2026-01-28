@@ -1,12 +1,16 @@
 'use client';
 
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import { useChat } from '@ai-sdk/react';
-import { TextStreamChatTransport } from 'ai';
-import { FileText, LogIn, MessageSquarePlus, Settings } from 'lucide-react';
-import { useState } from 'react';
+import { FileText, LogIn, LogOut, MessageSquarePlus, Settings } from 'lucide-react';
+import { useLayoutEffect, useMemo, useState } from 'react';
 import AuthModal from '@/components/auth-modal';
+import { Toaster } from '@/components/ui/sonner';
 import ModelSelector from '@/components/model-selector';
 import type { Provider } from '@/components/model-selector';
+import { createChatTransport, handleChatError } from '@/lib/api/ai-chat';
+import { getUser, removeToken } from '@/lib/auth/client';
 
 interface ChatAreaProps {
   provider: Provider;
@@ -27,14 +31,24 @@ function ChatArea({ provider, model }: ChatAreaProps) {
     }
   };
 
+  const transport = useMemo(
+    () => createChatTransport(getApiEndpoint(provider)),
+    [provider]
+  );
+
   const { messages, status, sendMessage } = useChat({
-    transport: new TextStreamChatTransport({ api: getApiEndpoint(provider) }),
+    transport,
+    onError: (err) => {
+      handleChatError(err);
+    },
   });
+
   const [inputValue, setInputValue] = useState('');
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim()) return;
+    
     const options = provider === 'siliconflow' && model ? { body: { model } } : undefined;
     sendMessage({ parts: [{ type: 'text', text: inputValue }] }, options);
     setInputValue('');
@@ -85,17 +99,42 @@ export default function Home() {
   const [selectedModel, setSelectedModel] = useState('');
   const [authOpen, setAuthOpen] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
+
+  // 页面加载时恢复登录态
+  useLayoutEffect(() => {
+    const user = getUser();
+    if (user) {
+      setUserEmail(user.email);
+      setUsername(user.username);
+    }
+  }, []);
+
+  // 退出登录处理函数
+  const handleLogout = () => {
+    if (confirm('确定要退出登录吗？')) {
+      removeToken();
+      setUserEmail(null);
+      setUsername(null);
+    }
+  };
+
+  // 检查是否已登录
+  const isLoggedIn = userEmail && username;
 
   return (
     <div className="relative flex h-screen">
-      <button
-        type="button"
-        onClick={() => setAuthOpen(true)}
-        className="absolute right-4 top-4 flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm hover:bg-gray-50"
-      >
-        <LogIn aria-hidden="true" className="h-4 w-4 text-gray-600" />
-        登录
-      </button>
+      {/* 未登录时显示登录按钮 */}
+      {!isLoggedIn && (
+        <button
+          type="button"
+          onClick={() => setAuthOpen(true)}
+          className="absolute right-4 top-4 flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm hover:bg-gray-50"
+        >
+          <LogIn aria-hidden="true" className="h-4 w-4 text-gray-600" />
+          登录
+        </button>
+      )}
 
       <aside className="flex w-56 flex-col border-r border-gray-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-gray-600">功能</h2>
@@ -127,12 +166,22 @@ export default function Home() {
         </div>
 
         <div className="mt-auto">
-          {userEmail ? (
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500 text-white">
-                {userEmail[0]?.toUpperCase()}
+          {isLoggedIn ? (
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500 text-white">
+                  {username[0]?.toUpperCase()}
+                </div>
+                <div className="text-sm text-gray-700">{username}</div>
               </div>
-              <div className="text-sm text-gray-700">{userEmail}</div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-red-500"
+                title="退出登录"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
             </div>
           ) : (
             <div className="text-sm text-gray-400">未登录</div>
@@ -156,7 +205,7 @@ export default function Home() {
           </div>
 
           <ChatArea
-            key={`${selectedProvider}-${selectedModel}`}
+            key={`${selectedProvider}-${selectedModel}-${isLoggedIn ? 'logged' : 'guest'}`}
             provider={selectedProvider}
             model={selectedProvider === 'siliconflow' ? selectedModel : undefined}
           />
@@ -165,8 +214,12 @@ export default function Home() {
       <AuthModal
         open={authOpen}
         onClose={() => setAuthOpen(false)}
-        onSuccess={(email) => setUserEmail(email)}
+        onSuccess={(email, username) => {
+          setUserEmail(email);
+          setUsername(username);
+        }}
       />
+      <Toaster />
     </div>
   );
 }

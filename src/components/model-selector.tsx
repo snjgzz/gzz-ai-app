@@ -47,8 +47,8 @@ export default function ModelSelector({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="deepseek">DeepSeek</SelectItem>
-            <SelectItem value="zhipu">智谱 AI</SelectItem>
+            {/* <SelectItem value="deepseek">DeepSeek</SelectItem>
+            <SelectItem value="zhipu">智谱 AI</SelectItem> */}
             <SelectItem value="siliconflow">硅基流动</SelectItem>
           </SelectContent>
         </Select>

@@ -4,16 +4,23 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import type { EncryptedPayload } from '@/lib/crypto/types';
 import { decryptPayload, encryptPayload } from '@/lib/crypto/client';
+import { toast } from 'sonner';
+import { Toaster } from '@/components/ui/sonner';
+import { setToken, setUser } from '@/lib/auth/client';
 
 interface AuthModalProps {
   open: boolean;
   onClose: () => void;
-  onSuccess?: (email: string) => void;
+  onSuccess?: (email: string, username: string) => void;
 }
 
 type Mode = 'login' | 'register';
 
-/** 登录/注册弹窗组件 */
+/**
+ * 登录/注册弹窗组件
+ * 支持登录和注册两种模式
+ * 注册成功后显示提示并切换到登录页面，不自动登录
+ */
 export default function AuthModal({
   open,
   onClose,
@@ -25,6 +32,14 @@ export default function AuthModal({
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+
+  // 重置表单状态
+  const resetForm = () => {
+    setUsername('');
+    setEmail('');
+    setPassword('');
+    setMessage('');
+  };
 
   if (!open) return null;
 
@@ -55,17 +70,36 @@ export default function AuthModal({
         body: JSON.stringify(encryptedBody),
       });
       const encrypted = (await res.json()) as EncryptedPayload;
-      const data = await decryptPayload<{ message?: string; error?: string }>(
-        encrypted
-      );
+      const data = await decryptPayload<{
+        message?: string;
+        error?: string;
+        token?: string;
+        user?: { id: string; username: string; email: string };
+      }>(encrypted);
+
       if (!res.ok) {
         setMessage(data.error ?? '请求失败');
         return;
       }
 
-      setMessage(data.message ?? '成功');
-      onSuccess?.(email);
-      onClose();
+      if (mode === 'register') {
+        // 注册成功：显示提示，切换到登录模式
+        toast.success(data.message ?? '注册成功，请登录');
+        resetForm();
+        setMode('login');
+      } else {
+        // 登录成功：保存 token 并回调
+        if (data.token) {
+          setToken(data.token);
+        }
+        if (data.user) {
+          setUser({ id: data.user.id, email: data.user.email, username: data.user.username });
+          onSuccess?.(data.user.email, data.user.username);
+        } else {
+          onSuccess?.(email, '');
+        }
+        onClose();
+      }
     } catch (error) {
       console.error(error);
 
@@ -76,7 +110,9 @@ export default function AuthModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <>
+      <Toaster />
+      <div className="fixed inset-0 z-50 flex items-center justify-center">
       <button
         type="button"
         onClick={onClose}
@@ -160,5 +196,6 @@ export default function AuthModal({
         ) : null}
       </div>
     </div>
+    </>
   );
 }

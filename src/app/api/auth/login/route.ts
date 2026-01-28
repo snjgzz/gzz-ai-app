@@ -2,6 +2,7 @@ import { jsonEncryptedResponse, readEncryptedJson } from '@/lib/crypto/server';
 import { prisma } from '@/lib/prisma';
 import { verifyPassword } from '@/lib/password';
 import { loginSchema } from '@/lib/validation';
+import { generateToken } from '@/lib/auth/token';
 
 export async function POST(req: Request) {
   try {
@@ -39,8 +40,12 @@ export async function POST(req: Request) {
       );
     }
 
+    // 生成 JWT token
+    const token = await generateToken(user.id, user.email, user.username);
+    console.log('login token:', token);
     return jsonEncryptedResponse({
       message: '登录成功',
+      token,
       user: {
         id: user.id,
         email: user.email,
